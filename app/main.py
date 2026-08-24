@@ -17,8 +17,14 @@ def main():
     def start_optimization():
         ui.btn_opt.config(state=tk.DISABLED, text="Optimizing...")
         ui.reset_plot()
-        optimizer = SimulatedAnnealer(initial_temp=5000.0, cooling_rate=0.999)
+        
+        # Read parameters from the new UI panel!
+        init_temp = ui.get_initial_temp()
+        cooling = ui.get_cooling_rate()
+        
+        optimizer = SimulatedAnnealer(initial_temp=init_temp, cooling_rate=cooling)
         optimizer.optimize(current_floorplan, iterations=15000, update_callback=on_update)
+        
         ui.btn_opt.config(state=tk.NORMAL, text="Run Optimizer")
 
     def load_file():

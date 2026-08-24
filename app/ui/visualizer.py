@@ -12,7 +12,6 @@ class Visualizer:
         self.master.title("SiliconMap - Live Optimization")
         self.plan = initial_plan
         
-        # 1. Main layout frames
         self.main_frame = tk.Frame(master_window)
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
@@ -22,12 +21,22 @@ class Visualizer:
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-        # controls and drawing canvas
         if load_cb:
             self.btn_load = tk.Button(self.left_frame, text="Load JSON File", command=load_cb, font=("Arial", 14))
             self.btn_load.pack(pady=5)
+            
+        # NEW: Settings Panel
+        self.settings_frame = tk.LabelFrame(self.left_frame, text="Algorithm Parameters", font=("Arial", 12))
+        self.settings_frame.pack(fill=tk.X, padx=10, pady=10)
         
-        # 2. Controls and Drawing Canvas
+        tk.Label(self.settings_frame, text="Initial Temp:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        self.temp_var = tk.StringVar(value="5000.0")
+        tk.Entry(self.settings_frame, textvariable=self.temp_var, width=10).grid(row=0, column=1, padx=5, pady=5)
+        
+        tk.Label(self.settings_frame, text="Cooling Rate:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        self.cooling_var = tk.StringVar(value="0.999")
+        tk.Entry(self.settings_frame, textvariable=self.cooling_var, width=10).grid(row=1, column=1, padx=5, pady=5)
+        
         if start_cb:
             self.btn_opt = tk.Button(self.left_frame, text="Run Optimizer", command=start_cb, font=("Arial", 14))
             self.btn_opt.pack(pady=5)
@@ -38,7 +47,6 @@ class Visualizer:
         self.canvas = tk.Canvas(self.left_frame, width=600, height=600, bg="white")
         self.canvas.pack()
 
-        # 3. Matplotlib Graph
         self.fig = Figure(figsize=(5, 5), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_title("Cost vs Iterations")
@@ -51,7 +59,6 @@ class Visualizer:
         self.iterations_data = []
         self.cost_data = []
 
-        # 4. Mouse variables and bindings
         self.selected_block = None
         self.drag_start_x = 0
         self.drag_start_y = 0
@@ -60,6 +67,19 @@ class Visualizer:
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_up)
 
         self.draw_floorplan(self.plan, calculate_total_cost(self.plan))
+
+    # NEW: Helper methods to safely read the UI inputs (add these right below __init__)
+    def get_initial_temp(self) -> float:
+        try:
+            return float(self.temp_var.get())
+        except ValueError:
+            return 5000.0  # Fallback if the user types letters by accident
+
+    def get_cooling_rate(self) -> float:
+        try:
+            return float(self.cooling_var.get())
+        except ValueError:
+            return 0.999   # Fallback
         
     def set_new_floorplan(self, new_plan: Floorplan):
         self.plan = new_plan
