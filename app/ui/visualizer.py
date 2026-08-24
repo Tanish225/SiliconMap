@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import messagebox
+import json
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from app.core.models import Floorplan
@@ -20,15 +22,19 @@ class Visualizer:
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-        # 2. Controls and Drawing Canvas (Left Side)
+        # 2. Controls and Drawing Canvas
         if start_cb:
             self.btn_opt = tk.Button(self.left_frame, text="Run Optimizer", command=start_cb, font=("Arial", 14))
             self.btn_opt.pack(pady=5)
+            
+        # NEW: Export Button
+        self.btn_export = tk.Button(self.left_frame, text="Save Results", command=self.export_results, font=("Arial", 14))
+        self.btn_export.pack(pady=5)
 
         self.canvas = tk.Canvas(self.left_frame, width=600, height=600, bg="white")
         self.canvas.pack()
 
-        # 3. Matplotlib Graph (Right Side)
+        # 3. Matplotlib Graph
         self.fig = Figure(figsize=(5, 5), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_title("Cost vs Iterations")
@@ -52,7 +58,6 @@ class Visualizer:
         self.draw_floorplan(self.plan, calculate_total_cost(self.plan))
 
     def reset_plot(self):
-        """Clears the graph before a new run."""
         self.iterations_data.clear()
         self.cost_data.clear()
         self.ax.clear()
@@ -60,6 +65,31 @@ class Visualizer:
         self.ax.set_xlabel("Iterations")
         self.ax.set_ylabel("Cost")
         self.plot_canvas.draw()
+
+    # NEW: Export Logic
+    def export_results(self):
+        try:
+            # Save Coordinates to JSON
+            export_data = {
+                "blocks": [
+                    {
+                        "name": b.name, 
+                        "x": round(b.x, 2), 
+                        "y": round(b.y, 2), 
+                        "width": b.width, 
+                        "height": b.height
+                    } for b in self.plan.blocks
+                ]
+            }
+            with open("optimized_layout.json", "w") as f:
+                json.dump(export_data, f, indent=4)
+                
+            # Save Graph to PNG
+            self.fig.savefig("cost_graph.png")
+            
+            messagebox.showinfo("Export Successful", "Saved 'optimized_layout.json' and 'cost_graph.png' to your SiliconMap folder!")
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to save files: {str(e)}")
 
     def on_mouse_down(self, event):
         offset_x, offset_y = 100, 100
@@ -106,7 +136,6 @@ class Visualizer:
             
         self.canvas.create_text(300, 30, text=f"Cost: {cost:.2f}  |  Temp: {temp:.2f}", font=("Arial", 16))
         
-        # Update the graph if optimization is running
         if iteration > 0:
             self.iterations_data.append(iteration)
             self.cost_data.append(cost)
