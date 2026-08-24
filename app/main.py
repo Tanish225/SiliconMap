@@ -1,16 +1,16 @@
+import tkinter as tk
 from app.core.models import Block, Net, Floorplan
-from app.metrics.cost import calculate_total_cost
 from app.algorithms.annealing import SimulatedAnnealer
+from app.ui.visualizer import Visualizer
 
 def main():
-    # 1. Create dummy blocks spread far apart (terrible initial placement)
-    alu = Block("ALU", width=40, height=30, x=0, y=0)
-    reg = Block("REG", width=20, height=20, x=200, y=200)
-    cache = Block("CACHE", width=50, height=40, x=100, y=500)
-    mux = Block("MUX", width=15, height=10, x=400, y=100)
-    ctrl = Block("CTRL", width=20, height=15, x=500, y=300)
+    # 1. Setup blocks (scaled up slightly so they are easier to see on screen)
+    alu = Block("ALU", width=80, height=60, x=0, y=0)
+    reg = Block("REG", width=40, height=40, x=300, y=300)
+    cache = Block("CACHE", width=100, height=80, x=100, y=500)
+    mux = Block("MUX", width=30, height=20, x=400, y=100)
+    ctrl = Block("CTRL", width=40, height=30, x=500, y=300)
 
-    # 2. Define the wires connecting them
     nets = [
         Net("ALU_to_REG", [alu, reg]),
         Net("ALU_to_MUX", [alu, mux]),
@@ -18,34 +18,24 @@ def main():
         Net("MUX_to_CTRL", [mux, ctrl])
     ]
 
-    # 3. Assemble the chip floorplan
     floorplan = Floorplan(blocks=[alu, reg, cache, mux, ctrl], nets=nets)
 
-    print("--- SILICONMAP: VLSI PLACEMENT OPTIMIZER ---")
-    
-    # 4. Check the initial cost
-    initial_cost = calculate_total_cost(floorplan)
-    print(f"Initial Wirelength Cost: {initial_cost:.2f} µm")
+    # 2. Setup the UI Window
+    root = tk.Tk()
+    ui = Visualizer(root, floorplan)
 
-    # 5. Run the Simulated Annealing optimizer
-    print("\nOptimizing...")
-    optimizer = SimulatedAnnealer(initial_temp=1000.0, cooling_rate=0.99)
-    
-    # Running 10,000 iterations takes a fraction of a second without a UI
-    optimized_plan = optimizer.optimize(floorplan, iterations=10000)
+    # 3. Define what happens when the optimizer pings the UI
+    def on_update(current_plan, current_cost, current_temp):
+        ui.draw_floorplan(current_plan, current_cost, current_temp)
 
-    # 6. Check the final cost
-    final_cost = calculate_total_cost(optimized_plan)
-    print(f"Final Wirelength Cost: {final_cost:.2f} µm")
+    # 4. Start the optimization!
+    optimizer = SimulatedAnnealer(initial_temp=5000.0, cooling_rate=0.999)
     
-    if initial_cost > 0:
-        improvement = ((initial_cost - final_cost) / initial_cost) * 100
-        print(f"Improvement: {improvement:.1f}%\n")
-
-    # 7. Print final coordinates to see where they ended up
-    print("Final Block Positions:")
-    for b in optimized_plan.blocks:
-        print(f"  {b.name}: (x: {b.x:.1f}, y: {b.y:.1f})")
+    # We delay the start by 1 second so you can see the terrible initial placement
+    root.after(1000, lambda: optimizer.optimize(floorplan, iterations=15000, update_callback=on_update))
+    
+    # 5. Keep the window open
+    root.mainloop()
 
 if __name__ == "__main__":
     main()

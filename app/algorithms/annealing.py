@@ -10,7 +10,7 @@ class SimulatedAnnealer:
         self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate
 
-    def optimize(self, floorplan: Floorplan, iterations: int = 1000) -> Floorplan:
+    def optimize(self, floorplan: Floorplan, iterations: int = 1000, update_callback=None) -> Floorplan:
         current_temp = self.initial_temp
         
         # Deep copy to avoid modifying the original until we are sure
@@ -51,5 +51,8 @@ class SimulatedAnnealer:
             
             # 4. Cool down
             current_temp *= self.cooling_rate
+            
+            if update_callback and i % 50 == 0:
+                update_callback(current_plan, current_cost, current_temp)
             
         return best_plan
