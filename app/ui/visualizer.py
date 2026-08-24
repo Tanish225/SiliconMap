@@ -1,4 +1,6 @@
 import tkinter as tk
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from app.core.models import Floorplan
 from app.metrics.cost import calculate_total_cost
 
@@ -8,95 +10,107 @@ class Visualizer:
         self.master.title("SiliconMap - Live Optimization")
         self.plan = initial_plan
         
-        # 1. Add a control panel with a button
-        self.control_frame = tk.Frame(master_window)
-        self.control_frame.pack(pady=10)
+        # 1. Main layout frames
+        self.main_frame = tk.Frame(master_window)
+        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
+        self.left_frame = tk.Frame(self.main_frame)
+        self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        self.right_frame = tk.Frame(self.main_frame)
+        self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        
+        # 2. Controls and Drawing Canvas (Left Side)
         if start_cb:
-            self.btn_opt = tk.Button(self.control_frame, text="Run Optimizer", command=start_cb, font=("Arial", 14))
-            self.btn_opt.pack()
+            self.btn_opt = tk.Button(self.left_frame, text="Run Optimizer", command=start_cb, font=("Arial", 14))
+            self.btn_opt.pack(pady=5)
 
-        self.canvas = tk.Canvas(master_window, width=800, height=800, bg="white")
+        self.canvas = tk.Canvas(self.left_frame, width=600, height=600, bg="white")
         self.canvas.pack()
 
-        # 2. State variables for dragging
+        # 3. Matplotlib Graph (Right Side)
+        self.fig = Figure(figsize=(5, 5), dpi=100)
+        self.ax = self.fig.add_subplot(111)
+        self.ax.set_title("Cost vs Iterations")
+        self.ax.set_xlabel("Iterations")
+        self.ax.set_ylabel("Cost")
+        
+        self.plot_canvas = FigureCanvasTkAgg(self.fig, master=self.right_frame)
+        self.plot_canvas.get_tk_widget().pack()
+        
+        self.iterations_data = []
+        self.cost_data = []
+
+        # 4. Mouse variables and bindings
         self.selected_block = None
         self.drag_start_x = 0
         self.drag_start_y = 0
-
-        # 3. Bind Mouse Events to the canvas
         self.canvas.bind("<ButtonPress-1>", self.on_mouse_down)
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_up)
 
         self.draw_floorplan(self.plan, calculate_total_cost(self.plan))
 
+    def reset_plot(self):
+        """Clears the graph before a new run."""
+        self.iterations_data.clear()
+        self.cost_data.clear()
+        self.ax.clear()
+        self.ax.set_title("Cost vs Iterations")
+        self.ax.set_xlabel("Iterations")
+        self.ax.set_ylabel("Cost")
+        self.plot_canvas.draw()
+
     def on_mouse_down(self, event):
-        offset_x, offset_y = 200, 200
-        # Iterate in reverse so if blocks overlap, you grab the one on top
+        offset_x, offset_y = 100, 100
         for block in reversed(self.plan.blocks):
-            x1 = block.x + offset_x
-            y1 = block.y + offset_y
-            x2 = x1 + block.width
-            y2 = y1 + block.height
-            
-            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            x1, y1 = block.x + offset_x, block.y + offset_y
+            if x1 <= event.x <= x1 + block.width and y1 <= event.y <= y1 + block.height:
                 self.selected_block = block
-                self.drag_start_x = event.x
-                self.drag_start_y = event.y
+                self.drag_start_x, self.drag_start_y = event.x, event.y
                 break
 
     def on_mouse_drag(self, event):
         if self.selected_block:
-            # Calculate how far the mouse moved
-            dx = event.x - self.drag_start_x
-            dy = event.y - self.drag_start_y
-            
-            # Move the block
-            self.selected_block.x += dx
-            self.selected_block.y += dy
-            
-            # Reset start position for the next frame of the drag
-            self.drag_start_x = event.x
-            self.drag_start_y = event.y
-            
-            # Live update the UI and cost while dragging
-            live_cost = calculate_total_cost(self.plan)
-            self.draw_floorplan(self.plan, cost=live_cost, temp=0.0)
+            self.selected_block.x += event.x - self.drag_start_x
+            self.selected_block.y += event.y - self.drag_start_y
+            self.drag_start_x, self.drag_start_y = event.x, event.y
+            self.draw_floorplan(self.plan, cost=calculate_total_cost(self.plan))
 
     def on_mouse_up(self, event):
         self.selected_block = None
 
-    def draw_floorplan(self, floorplan: Floorplan, cost: float = 0.0, temp: float = 0.0):
-        self.plan = floorplan # Update internal reference
+    def draw_floorplan(self, floorplan: Floorplan, cost: float = 0.0, temp: float = 0.0, iteration: int = 0):
+        self.plan = floorplan
         self.canvas.delete("all")
-        offset_x, offset_y = 200, 200
+        offset_x, offset_y = 100, 100
         
-        # Draw Wires
+        # Wires
         for net in floorplan.nets:
             if len(net.connected_blocks) >= 2:
                 for i in range(len(net.connected_blocks) - 1):
-                    b1 = net.connected_blocks[i]
-                    b2 = net.connected_blocks[i+1]
-                    x1 = b1.x + offset_x + (b1.width / 2)
-                    y1 = b1.y + offset_y + (b1.height / 2)
-                    x2 = b2.x + offset_x + (b2.width / 2)
-                    y2 = b2.y + offset_y + (b2.height / 2)
-                    self.canvas.create_line(x1, y1, x2, y2, fill="gray", dash=(4, 4))
+                    b1, b2 = net.connected_blocks[i], net.connected_blocks[i+1]
+                    self.canvas.create_line(
+                        b1.x + offset_x + b1.width/2, b1.y + offset_y + b1.height/2,
+                        b2.x + offset_x + b2.width/2, b2.y + offset_y + b2.height/2,
+                        fill="gray", dash=(4, 4)
+                    )
         
-        # Draw Blocks
+        # Blocks
         for block in floorplan.blocks:
-            x1 = block.x + offset_x
-            y1 = block.y + offset_y
-            x2 = x1 + block.width
-            y2 = y1 + block.height
+            x1, y1 = block.x + offset_x, block.y + offset_y
+            outline = "red" if block == self.selected_block else "blue"
+            width = 3 if block == self.selected_block else 2
+            self.canvas.create_rectangle(x1, y1, x1 + block.width, y1 + block.height, fill="#ADD8E6", outline=outline, width=width)
+            self.canvas.create_text(x1 + block.width/2, y1 + block.height/2, text=block.name)
             
-            # Highlight the block in red if you are currently dragging it
-            outline_color = "red" if block == self.selected_block else "blue"
-            line_width = 3 if block == self.selected_block else 2
+        self.canvas.create_text(300, 30, text=f"Cost: {cost:.2f}  |  Temp: {temp:.2f}", font=("Arial", 16))
+        
+        # Update the graph if optimization is running
+        if iteration > 0:
+            self.iterations_data.append(iteration)
+            self.cost_data.append(cost)
+            self.ax.plot(self.iterations_data, self.cost_data, color="blue")
+            self.plot_canvas.draw()
             
-            self.canvas.create_rectangle(x1, y1, x2, y2, fill="#ADD8E6", outline=outline_color, width=line_width)
-            self.canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2, text=block.name)
-            
-        self.canvas.create_text(400, 30, text=f"Cost: {cost:.2f}  |  Temp: {temp:.2f}", font=("Arial", 16))
         self.master.update()

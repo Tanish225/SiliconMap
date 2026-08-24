@@ -52,7 +52,8 @@ class SimulatedAnnealer:
             # 4. Cool down
             current_temp *= self.cooling_rate
             
+            # NEW: Pass the iteration 'i' back to the UI
             if update_callback and i % 50 == 0:
-                update_callback(current_plan, current_cost, current_temp)
+                update_callback(current_plan, current_cost, current_temp, i)
             
         return best_plan
