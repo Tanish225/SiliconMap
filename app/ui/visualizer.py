@@ -7,7 +7,7 @@ from app.core.models import Floorplan
 from app.metrics.cost import calculate_total_cost
 
 class Visualizer:
-    def __init__(self, master_window, initial_plan: Floorplan, start_cb=None):
+    def __init__(self, master_window, initial_plan: Floorplan, start_cb=None, load_cb=None):
         self.master = master_window
         self.master.title("SiliconMap - Live Optimization")
         self.plan = initial_plan
@@ -22,12 +22,16 @@ class Visualizer:
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
+        # controls and drawing canvas
+        if load_cb:
+            self.btn_load = tk.Button(self.left_frame, text="Load JSON File", command=load_cb, font=("Arial", 14))
+            self.btn_load.pack(pady=5)
+        
         # 2. Controls and Drawing Canvas
         if start_cb:
             self.btn_opt = tk.Button(self.left_frame, text="Run Optimizer", command=start_cb, font=("Arial", 14))
             self.btn_opt.pack(pady=5)
             
-        # NEW: Export Button
         self.btn_export = tk.Button(self.left_frame, text="Save Results", command=self.export_results, font=("Arial", 14))
         self.btn_export.pack(pady=5)
 
@@ -55,6 +59,11 @@ class Visualizer:
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_up)
 
+        self.draw_floorplan(self.plan, calculate_total_cost(self.plan))
+        
+    def set_new_floorplan(self, new_plan: Floorplan):
+        self.plan = new_plan
+        self.reset_plot()
         self.draw_floorplan(self.plan, calculate_total_cost(self.plan))
 
     def reset_plot(self):

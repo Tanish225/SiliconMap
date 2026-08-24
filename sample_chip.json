@@ -1,0 +1,15 @@
+{
+  "blocks": [
+    {"name": "ALU", "width": 80, "height": 60, "x": 0, "y": 0},
+    {"name": "REG", "width": 40, "height": 40, "x": 300, "y": 300},
+    {"name": "CACHE", "width": 100, "height": 80, "x": 100, "y": 500},
+    {"name": "MUX", "width": 30, "height": 20, "x": 400, "y": 100},
+    {"name": "CTRL", "width": 40, "height": 30, "x": 500, "y": 300}
+  ],
+  "nets": [
+    {"name": "ALU_to_REG", "blocks": ["ALU", "REG"]},
+    {"name": "ALU_to_MUX", "blocks": ["ALU", "MUX"]},
+    {"name": "REG_to_CACHE", "blocks": ["REG", "CACHE"]},
+    {"name": "MUX_to_CTRL", "blocks": ["MUX", "CTRL"]}
+  ]
+}
