@@ -25,8 +25,8 @@ You'll need Python 3.8 or newer installed on your machine. The only external dep
 Open your command prompt or PowerShell and run:
 
 1. Clone the repo and navigate into it:
-   ```cmd
-  git clone [https://github.com/Tanish225/SiliconMap.git]
+   cmd
+   git clone [https://github.com/Tanish225/SiliconMap.git]
    cd SiliconMap
 
 2. Set up a virtual environment:
