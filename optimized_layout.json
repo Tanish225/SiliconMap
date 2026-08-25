@@ -1,39 +1,151 @@
 {
+    "chip_width": 769.0,
+    "chip_height": 769.0,
     "blocks": [
         {
-            "name": "ALU",
-            "x": 371.79,
-            "y": 216.72,
-            "width": 80,
-            "height": 60
+            "name": "ALU_1",
+            "x": 184.61,
+            "y": 197.12,
+            "width": 120.0,
+            "height": 100.0
         },
         {
-            "name": "REG",
-            "x": 330.3,
-            "y": 232.42,
-            "width": 40,
-            "height": 40
+            "name": "CACHE_1",
+            "x": 24.47,
+            "y": 189.41,
+            "width": 160.0,
+            "height": 120.0
         },
         {
-            "name": "CACHE",
-            "x": 395.22,
-            "y": 126.32,
-            "width": 100,
-            "height": 80
+            "name": "REG_1",
+            "x": 193.99,
+            "y": 297.16,
+            "width": 60.0,
+            "height": 60.0
         },
         {
-            "name": "MUX",
-            "x": 454.61,
-            "y": 236.65,
-            "width": 30,
-            "height": 20
+            "name": "REG_2",
+            "x": 200.35,
+            "y": 357.27,
+            "width": 60.0,
+            "height": 60.0
         },
         {
-            "name": "CTRL",
-            "x": 452.38,
-            "y": 257.44,
-            "width": 40,
-            "height": 30
+            "name": "CTRL_1",
+            "x": 233.74,
+            "y": 135.55,
+            "width": 80.0,
+            "height": 60.0
+        },
+        {
+            "name": "MUX_1",
+            "x": 193.32,
+            "y": 153.71,
+            "width": 40.0,
+            "height": 40.0
+        },
+        {
+            "name": "CACHE_2",
+            "x": 608.15,
+            "y": 201.25,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_3",
+            "x": 404.99,
+            "y": 648.75,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_4",
+            "x": 607.06,
+            "y": 646.78,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_5",
+            "x": 608.57,
+            "y": 426.77,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_6",
+            "x": 0.46,
+            "y": 646.06,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_7",
+            "x": 0.12,
+            "y": 409.07,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_8",
+            "x": 362.44,
+            "y": 0.73,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_9",
+            "x": 608.63,
+            "y": 3.83,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_10",
+            "x": 194.49,
+            "y": 648.49,
+            "width": 160,
+            "height": 120
+        },
+        {
+            "name": "CACHE_11",
+            "x": 4.5,
+            "y": 0.42,
+            "width": 160,
+            "height": 120
+        }
+    ],
+    "nets": [
+        {
+            "name": "ALU_to_Cache",
+            "blocks": [
+                "ALU_1",
+                "CACHE_1"
+            ]
+        },
+        {
+            "name": "ALU_to_Regs",
+            "blocks": [
+                "ALU_1",
+                "REG_1",
+                "REG_2"
+            ]
+        },
+        {
+            "name": "Ctrl_Bus",
+            "blocks": [
+                "CTRL_1",
+                "ALU_1",
+                "MUX_1"
+            ]
+        },
+        {
+            "name": "Mux_Out",
+            "blocks": [
+                "MUX_1",
+                "CACHE_1",
+                "REG_1"
+            ]
         }
     ]
 }
