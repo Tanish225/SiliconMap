@@ -1,59 +1,57 @@
-# It will randomly shift blocks around, check the new cost, and decide whether to keep the move based on the "temperature".
-import math
 import random
+import math
 import copy
 from app.core.models import Floorplan
 from app.metrics.cost import calculate_total_cost
 
 class SimulatedAnnealer:
-    def __init__(self, initial_temp: float = 1000.0, cooling_rate: float = 0.95):
+    def __init__(self, initial_temp: float = 5000.0, cooling_rate: float = 0.999):
         self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate
 
     def optimize(self, floorplan: Floorplan, iterations: int = 1000, update_callback=None) -> Floorplan:
+        current_plan = copy.deepcopy(floorplan)
+        best_plan = copy.deepcopy(floorplan)
+        
+        current_cost = calculate_total_cost(current_plan)
+        best_cost = current_cost
         current_temp = self.initial_temp
         
-        # Deep copy to avoid modifying the original until we are sure
-        best_plan = copy.deepcopy(floorplan)
-        current_plan = copy.deepcopy(floorplan)
-        
-        best_cost = calculate_total_cost(best_plan)
-        current_cost = best_cost
-        
         for i in range(iterations):
-            # 1. Pick a random block and perturb it
-            block_to_move = random.choice(current_plan.blocks)
-            old_x, old_y = block_to_move.x, block_to_move.y
+            if not current_plan.blocks:
+                break
+                
+            block_idx = random.randint(0, len(current_plan.blocks) - 1)
+            old_x = current_plan.blocks[block_idx].x
+            old_y = current_plan.blocks[block_idx].y
             
-            # Move randomly within a small radius
-            block_to_move.x += random.uniform(-10, 10)
-            block_to_move.y += random.uniform(-10, 10)
+            # Perturb
+            current_plan.blocks[block_idx].x += random.uniform(-30, 30)
+            current_plan.blocks[block_idx].y += random.uniform(-30, 30)
             
-            # 2. Calculate new cost
             new_cost = calculate_total_cost(current_plan)
-            delta_cost = new_cost - current_cost
+            cost_diff = new_cost - current_cost
             
-            # 3. Decide whether to accept the move
-            if delta_cost < 0:
-                # Better cost: always accept
+            if cost_diff < 0 or random.random() < math.exp(-cost_diff / max(current_temp, 0.0001)):
                 current_cost = new_cost
-                if new_cost < best_cost:
-                    best_cost = new_cost
+                if current_cost < best_cost:
+                    best_cost = current_cost
                     best_plan = copy.deepcopy(current_plan)
             else:
-                # Worse cost: maybe accept based on temperature
-                probability = math.exp(-delta_cost / current_temp)
-                if random.random() < probability:
-                    current_cost = new_cost # Accepted!
-                else:
-                    # Rejected: revert the move
-                    block_to_move.x, block_to_move.y = old_x, old_y
-            
-            # 4. Cool down
+                current_plan.blocks[block_idx].x = old_x
+                current_plan.blocks[block_idx].y = old_y
+                
             current_temp *= self.cooling_rate
             
-            # NEW: Pass the iteration 'i' back to the UI
             if update_callback and i % 50 == 0:
                 update_callback(current_plan, current_cost, current_temp, i)
+        
+        # Apply the best results to the original object
+        for i in range(len(best_plan.blocks)):
+            floorplan.blocks[i].x = best_plan.blocks[i].x
+            floorplan.blocks[i].y = best_plan.blocks[i].y
+            
+        if update_callback:
+            update_callback(floorplan, best_cost, current_temp, iterations)
             
         return best_plan
