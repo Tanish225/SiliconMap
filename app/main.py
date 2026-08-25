@@ -23,7 +23,7 @@ def main():
         cooling = ui.get_cooling_rate()
         
         optimizer = SimulatedAnnealer(initial_temp=init_temp, cooling_rate=cooling)
-        optimizer.optimize(current_floorplan, iterations=15000, update_callback=on_update)
+        optimizer.optimize(ui.plan, iterations=15000, update_callback=on_update)
         
         ui.btn_opt.config(state=tk.NORMAL, text="Run Optimizer")
 
