@@ -26,7 +26,7 @@ Open your command prompt or PowerShell and run:
 
 1. Clone the repo and navigate into it:
    ```cmd
-   git clone [https://github.com/YourUsername/SiliconMap.git](https://github.com/YourUsername/SiliconMap.git)
+  git clone [https://github.com/Tanish225/SiliconMap.git]
    cd SiliconMap
 
 2. Set up a virtual environment:
