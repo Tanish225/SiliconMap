@@ -6,21 +6,21 @@
 
 ---
 
-## 🌟 Key Features
+##  Key Features
 
-* **⏱️ Interconnect Delay Modeling & Monitoring (Elmore $RC$ Model):**  
+* ** Interconnect Delay Modeling & Monitoring (Elmore $RC$ Model):**  
   Calculates signal propagation delay across interconnects in picoseconds ($ps$) using Bakoglu's distributed $RC$ formulation. Real-time critical path identification highlights latency bottlenecks directly on the canvas.
-* **🔥 Thermal Hotspot Management:**  
+* ** Thermal Hotspot Management:**  
   Penalizes spatial clustering of high-power components ($\propto \frac{P_i \cdot P_j}{\text{dist}}$) to prevent localized overheating.
-* **⚡ Multi-Objective Placement Optimization:**  
+* ** Multi-Objective Placement Optimization:**  
   Simulated Annealing engine driven by dynamic temperature cooling and adaptive step-size scaling to simultaneously resolve overlaps, wirelength, congestion, out-of-bounds, and delay penalties.
-* **📊 Real-Time Analytics:**  
+* ** Real-Time Analytics:**  
   Synchronized three-tier Matplotlib analytics plotting **Total Cost**, **Critical Path Delay ($ps$)**, and **Temperature Decay** across iterations.
-* **📐 Physical Feasibility Checker:**  
+* ** Physical Feasibility Checker:**  
   2D shelf-packing heuristic and geometric bounds ensure components physically fit within die dimensions before optimization, suggesting minimal viable die sizes when packed too tightly.
-* **🎨 Interactive CAD Canvas:**  
+* ** Interactive CAD Canvas:**  
   Smooth mouse-wheel zoom, panning, block drag-and-drop, corner-handle mouse resizing, 90° rotation, heat-map toggle, and on-wire timing latency tags.
-* **📦 Component Library + Custom Blocks:**  
+* ** Component Library + Custom Blocks:**  
   Includes 15 built-in VLSI macro blocks (`ALU`, `FPU`, `CTRL`, `DECODER`, `REG`, `CACHE`, `RAM`, `ROM`, `MUX`, `DMA`, `UART`, `GPIO`, `ADC`, `PLL`, `PMU`) plus full support for user-defined dimensions and power ratings.
 
 ---
@@ -86,7 +86,7 @@ python -m app.main
 
 ---
 
-## 🎮 Usage Guide
+##  Usage Guide
 
 1. **Set Initial Die Size:**  
    Configure chip width and height on startup (presets or custom size in $\mu m$).
@@ -156,7 +156,7 @@ SiliconMap/
 
 ---
 
-## 📄 Floorplan JSON Format
+##  Floorplan JSON Format
 
 SiliconMap saves and loads layout configurations using human-readable JSON:
 
@@ -192,6 +192,6 @@ SiliconMap saves and loads layout configurations using human-readable JSON:
 
 ---
 
-## 🛡️ License
+##  License
 
 This project is licensed under the MIT License. Contributions and feedback are welcome!
