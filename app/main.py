@@ -27,7 +27,7 @@ def main():
         params = ui.get_optimizer_params()
         if params is None or not ui.apply_chip_size():
             return
-        init_temp, cooling, iterations, allow_rotation = params
+        init_temp, cooling, iterations, allow_rotation, optimize_delay = params
 
         # Can these components physically fit on this die?
         feas = check_feasibility(ui.plan.blocks, ui.plan.chip_width, ui.plan.chip_height, allow_rotation)
@@ -51,7 +51,8 @@ def main():
         ui.set_running(True)
         ui.reset_plot()
         try:
-            SimulatedAnnealer(initial_temp=init_temp, cooling_rate=cooling, allow_rotation=allow_rotation) \
+            SimulatedAnnealer(initial_temp=init_temp, cooling_rate=cooling,
+                              allow_rotation=allow_rotation, optimize_delay=optimize_delay) \
                 .optimize(ui.plan, iterations=iterations, update_callback=on_update)
         except tk.TclError:
             return                                    # window was closed mid-run

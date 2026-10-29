@@ -8,10 +8,11 @@ from app.metrics.cost import calculate_total_cost, cost_breakdown
 
 class SimulatedAnnealer:
     def __init__(self, initial_temp: float = 5000.0, cooling_rate: float = 0.999,
-                 allow_rotation: bool = True):
+                 allow_rotation: bool = True, optimize_delay: bool = True):
         self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate
         self.allow_rotation = allow_rotation
+        self.optimize_delay = optimize_delay
 
     @staticmethod
     def _clamp(block, chip_w, chip_h):
@@ -24,7 +25,7 @@ class SimulatedAnnealer:
     def _seed_legal_layout(self, plan: Floorplan):
         """If the current layout is illegal (e.g. all blocks spawned on top of each
         other), start from a legal shelf-packed layout instead."""
-        if cost_breakdown(plan)["legal"]:
+        if cost_breakdown(plan, optimize_delay=self.optimize_delay)["legal"]:
             return
         placement = pack(plan.blocks, plan.chip_width, plan.chip_height, self.allow_rotation)
         if placement:
@@ -37,7 +38,7 @@ class SimulatedAnnealer:
         self._seed_legal_layout(current_plan)
         best_plan = copy.deepcopy(current_plan)
 
-        current_cost = calculate_total_cost(current_plan)
+        current_cost = calculate_total_cost(current_plan, optimize_delay=self.optimize_delay)
         best_cost = current_cost
         current_temp = self.initial_temp
         W, H = current_plan.chip_width, current_plan.chip_height
@@ -77,7 +78,7 @@ class SimulatedAnnealer:
                 self._clamp(A, W, H)
                 undo = lambda A=A, s=saved: (setattr(A, "x", s[0]), setattr(A, "y", s[1]))
 
-            new_cost = calculate_total_cost(current_plan)
+            new_cost = calculate_total_cost(current_plan, optimize_delay=self.optimize_delay)
             cost_diff = new_cost - current_cost
 
             if cost_diff < 0 or random.random() < math.exp(-cost_diff / max(current_temp, 0.0001)):

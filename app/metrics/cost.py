@@ -1,10 +1,17 @@
 import math
 from app.core.models import Floorplan, Net, Block
+from app.metrics.delay import (
+    calculate_delay_stats,
+    calculate_net_delay,
+    DELAY_WEIGHT,
+    CRITICAL_NET_WEIGHT,
+)
 
 OVERLAP_WEIGHT = 2000.0
 CONGESTION_WEIGHT = 50.0
 BOUNDS_WEIGHT = 3000.0
 THERMAL_WEIGHT = 10.0
+
 
 
 def calculate_hpwl(net: Net) -> float:
@@ -83,27 +90,49 @@ def calculate_thermal_penalty(floorplan: Floorplan) -> float:
     return penalty
 
 
-def cost_breakdown(floorplan: Floorplan) -> dict:
-    """Every cost term separately, plus legality information for the UI."""
+def cost_breakdown(floorplan: Floorplan, optimize_delay: bool = True) -> dict:
+    """Every cost term separately, including timing delay and legality information."""
     wl = sum(calculate_hpwl(n) for n in floorplan.nets)
     ov = calculate_total_overlap(floorplan)
     cg = calculate_congestion(floorplan)
     oob = calculate_out_of_bounds_penalty(floorplan)
     heat = calculate_thermal_penalty(floorplan)
+    delay_stats = calculate_delay_stats(floorplan)
+
+    delay_cost = (delay_stats["penalty"] * DELAY_WEIGHT) if optimize_delay else 0.0
     total = (wl + ov * OVERLAP_WEIGHT + cg * CONGESTION_WEIGHT
-             + oob * BOUNDS_WEIGHT + heat * THERMAL_WEIGHT)
+             + oob * BOUNDS_WEIGHT + heat * THERMAL_WEIGHT + delay_cost)
+
     return {
-        "total": total, "wirelength": wl, "overlap_area": ov, "congestion": cg,
-        "out_of_bounds": oob, "thermal": heat,
+        "total": total,
+        "wirelength": wl,
+        "overlap_area": ov,
+        "congestion": cg,
+        "out_of_bounds": oob,
+        "thermal": heat,
         "overlap_count": count_overlaps(floorplan),
         "legal": count_overlaps(floorplan) == 0 and oob < 0.01,
+        # Timing / Delay metrics (in picoseconds)
+        "total_delay": delay_stats["total_delay"],
+        "max_delay": delay_stats["max_delay"],
+        "critical_net": delay_stats["critical_net"],
+        "avg_delay": delay_stats["avg_delay"],
+        "net_delays": delay_stats["net_delays"],
+        "delay_penalty": delay_stats["penalty"],
     }
 
 
 def calculate_total_cost(floorplan: Floorplan, overlap_weight: float = OVERLAP_WEIGHT,
-                         congestion_weight: float = CONGESTION_WEIGHT) -> float:
+                         congestion_weight: float = CONGESTION_WEIGHT,
+                         delay_weight: float = DELAY_WEIGHT,
+                         optimize_delay: bool = True) -> float:
     wl = sum(calculate_hpwl(n) for n in floorplan.nets)
+    delay_cost = 0.0
+    if optimize_delay and floorplan.nets:
+        delay_cost = calculate_delay_stats(floorplan)["penalty"] * delay_weight
+
     return (wl + calculate_total_overlap(floorplan) * overlap_weight
             + calculate_congestion(floorplan) * congestion_weight
             + calculate_out_of_bounds_penalty(floorplan) * BOUNDS_WEIGHT
-            + calculate_thermal_penalty(floorplan) * THERMAL_WEIGHT)
+            + calculate_thermal_penalty(floorplan) * THERMAL_WEIGHT
+            + delay_cost)

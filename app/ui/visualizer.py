@@ -8,6 +8,7 @@ from app.core.models import Floorplan, Block, Net
 from app.core.library import COMPONENT_LIBRARY, colour_of, kind_of
 from app.core.feasibility import check_feasibility
 from app.metrics.cost import cost_breakdown, calculate_overlap_area
+from app.metrics.delay import calculate_delay_stats, calculate_net_delay
 from app.ui.dialogs import ask_custom_block, MIN_DIM, MAX_DIM
 
 BG, PANEL, DARK = "#f4f6f8", "#ffffff", "#1f2d3d"
@@ -28,12 +29,14 @@ class Visualizer:
         self.zoom, self.pan_x, self.pan_y = 1.0, 40.0, 40.0
         self.show_grid = tk.BooleanVar(value=True)
         self.show_heat = tk.BooleanVar(value=False)
+        self.show_delay = tk.BooleanVar(value=True)
         self.rotation_var = tk.BooleanVar(value=True)
+        self.optimize_delay_var = tk.BooleanVar(value=True)
         self.selected_block = None
         self.mode = None            # "move" | "resize" | "pan"
         self.running = False
         self._fitted = False
-        self.iterations_data, self.cost_data, self.temp_data = [], [], []
+        self.iterations_data, self.cost_data, self.temp_data, self.delay_data = [], [], [], []
 
         self._style()
         self._build_header()
@@ -145,6 +148,7 @@ class Visualizer:
             ttk.Label(opt, text=text).grid(row=r, column=0, sticky="e", padx=4, pady=3)
             ttk.Entry(opt, textvariable=var, width=10).grid(row=r, column=1, sticky="w", pady=3)
         ttk.Checkbutton(opt, text="Allow 90\u00b0 rotation", variable=self.rotation_var).grid(row=3, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        ttk.Checkbutton(opt, text="Optimize timing delay (Elmore RC)", variable=self.optimize_delay_var).grid(row=4, column=0, columnspan=2, sticky="w", pady=(2, 0))
 
     def _build_center(self, parent, start_cb, load_cb):
         center = ttk.Frame(parent)
@@ -155,6 +159,7 @@ class Visualizer:
             ttk.Button(bar, text=text, width=4, command=cmd).pack(side=tk.LEFT, padx=2)
         ttk.Checkbutton(bar, text="Grid", variable=self.show_grid, command=self.refresh).pack(side=tk.LEFT, padx=(10, 2))
         ttk.Checkbutton(bar, text="Heat map", variable=self.show_heat, command=self.refresh).pack(side=tk.LEFT, padx=2)
+        ttk.Checkbutton(bar, text="Delay / Timing", variable=self.show_delay, command=self.refresh).pack(side=tk.LEFT, padx=2)
         self.btn_opt = ttk.Button(bar, text="\u25b6  Run Optimizer", style="Accent.TButton", command=start_cb)
         self.btn_opt.pack(side=tk.RIGHT, padx=2)
         ttk.Button(bar, text="Save", command=self.export_results).pack(side=tk.RIGHT, padx=2)
@@ -173,9 +178,10 @@ class Visualizer:
         tk.Label(mf, textvariable=self.metrics_var, justify="left", anchor="w", bg=BG, fg=DARK, font=("Consolas", 9)).pack(fill=tk.X)
         gf = ttk.LabelFrame(right, text="Real-time analytics", padding=4)
         gf.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        self.fig = Figure(figsize=(3.2, 3.6), dpi=100)
-        self.ax_cost = self.fig.add_subplot(211)
-        self.ax_temp = self.fig.add_subplot(212)
+        self.fig = Figure(figsize=(3.2, 4.4), dpi=100)
+        self.ax_cost = self.fig.add_subplot(311)
+        self.ax_delay = self.fig.add_subplot(312)
+        self.ax_temp = self.fig.add_subplot(313)
         self._style_axes()
         self.plot_canvas = FigureCanvasTkAgg(self.fig, master=gf)
         self.plot_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -200,15 +206,17 @@ class Visualizer:
         self.master.bind("<Delete>", self.delete_selected)
 
     def _style_axes(self):
-        self.ax_cost.set_title("Cost vs iterations", fontsize=9)
-        self.ax_cost.set_ylabel("Cost", fontsize=8)
-        self.ax_temp.set_title("Temperature decay", fontsize=9)
-        self.ax_temp.set_xlabel("Iterations", fontsize=8)
-        self.ax_temp.set_ylabel("Temperature", fontsize=8)
-        for ax in (self.ax_cost, self.ax_temp):
-            ax.tick_params(labelsize=7)
+        self.ax_cost.set_title("Cost vs iterations", fontsize=8)
+        self.ax_cost.set_ylabel("Cost", fontsize=7)
+        self.ax_delay.set_title("Critical net delay (ps)", fontsize=8)
+        self.ax_delay.set_ylabel("Delay (ps)", fontsize=7)
+        self.ax_temp.set_title("Temperature decay", fontsize=8)
+        self.ax_temp.set_xlabel("Iterations", fontsize=7)
+        self.ax_temp.set_ylabel("Temp", fontsize=7)
+        for ax in (self.ax_cost, self.ax_delay, self.ax_temp):
+            ax.tick_params(labelsize=6)
             ax.grid(True, alpha=0.25)
-        self.fig.tight_layout(pad=1.6)
+        self.fig.tight_layout(pad=1.2)
 
     # ------------------------------------------------------------------ status helpers
     def set_message(self, text, level="info"):
@@ -218,8 +226,11 @@ class Visualizer:
 
     def update_stats(self):
         p = self.plan
-        bd = cost_breakdown(p)
-        self.stats_var.set(f"Blocks: {len(p.blocks)}   Nets: {len(p.nets)}   Utilization: {p.utilization() * 100:.0f}%   "
+        bd = cost_breakdown(p, optimize_delay=self.optimize_delay_var.get())
+        delay_info = ""
+        if bd.get("max_delay") and bd["max_delay"] > 0:
+            delay_info = f"   Max Delay: {bd['max_delay']:.1f} ps ({bd['critical_net'] or 'crit'})"
+        self.stats_var.set(f"Blocks: {len(p.blocks)}   Nets: {len(p.nets)}{delay_info}   Utilization: {p.utilization() * 100:.0f}%   "
                            f"Overlaps: {bd['overlap_count']}   Out of bounds: {'yes' if bd['out_of_bounds'] > 0.01 else 'no'}")
         return bd
 
@@ -458,7 +469,7 @@ class Visualizer:
 
     # ------------------------------------------------------------------ optimizer parameters
     def get_optimizer_params(self):
-        """Returns (temp, cooling, iterations, allow_rotation) or None after showing an error."""
+        """Returns (temp, cooling, iterations, allow_rotation, optimize_delay) or None after showing an error."""
         try:
             temp = float(self.temp_var.get()); cooling = float(self.cooling_var.get()); iters = int(float(self.iter_var.get()))
             if temp <= 0 or not (0 < cooling < 1) or not (100 <= iters <= 500000):
@@ -467,7 +478,7 @@ class Visualizer:
             messagebox.showerror("Invalid optimizer settings",
                                  "Initial temp must be > 0, cooling rate between 0 and 1 (e.g. 0.999) and iterations between 100 and 500000.")
             return None
-        return temp, cooling, iters, self.rotation_var.get()
+        return temp, cooling, iters, self.rotation_var.get(), self.optimize_delay_var.get()
 
     def set_running(self, flag):
         self.running = flag
@@ -490,17 +501,21 @@ class Visualizer:
             self.show_insufficient(feas, "the loaded components")
 
     def reset_plot(self):
-        self.iterations_data.clear(); self.cost_data.clear(); self.temp_data.clear()
-        self.ax_cost.clear(); self.ax_temp.clear()
+        self.iterations_data.clear(); self.cost_data.clear(); self.temp_data.clear(); self.delay_data.clear()
+        self.ax_cost.clear(); self.ax_delay.clear(); self.ax_temp.clear()
         self._style_axes()
         self.plot_canvas.draw()
         self.metrics_var.set("Run the optimizer to see results.")
 
     def show_metrics(self):
-        bd = cost_breakdown(self.plan)
+        bd = cost_breakdown(self.plan, optimize_delay=self.optimize_delay_var.get())
+        crit_label = f" ({bd['critical_net']})" if bd.get("critical_net") else ""
         self.metrics_var.set(
             f"Total cost    : {bd['total']:,.1f}\n"
             f"Wirelength    : {bd['wirelength']:,.1f} \u03bcm\n"
+            f"Max net delay : {bd['max_delay']:.2f} ps{crit_label}\n"
+            f"Avg net delay : {bd['avg_delay']:.2f} ps\n"
+            f"Total delay   : {bd['total_delay']:.2f} ps\n"
             f"Overlap area  : {bd['overlap_area']:,.1f} \u03bcm\u00b2 ({bd['overlap_count']} pairs)\n"
             f"Out of bounds : {bd['out_of_bounds']:,.1f} \u03bcm\n"
             f"Congestion    : {bd['congestion']:,.0f}\n"
@@ -519,11 +534,18 @@ class Visualizer:
         if not path:
             return
         try:
+            delay_stats = calculate_delay_stats(self.plan)
             data = {
                 "chip_width": self.plan.chip_width, "chip_height": self.plan.chip_height,
+                "metrics": {
+                    "max_delay_ps": round(delay_stats["max_delay"], 2),
+                    "avg_delay_ps": round(delay_stats["avg_delay"], 2),
+                    "critical_net": delay_stats["critical_net"],
+                },
                 "blocks": [{"name": b.name, "kind": b.kind, "x": round(b.x, 2), "y": round(b.y, 2),
                             "width": b.width, "height": b.height, "power_watts": b.power_watts} for b in self.plan.blocks],
-                "nets": [{"name": n.name, "blocks": [b.name for b in n.connected_blocks]} for n in self.plan.nets],
+                "nets": [{"name": n.name, "blocks": [b.name for b in n.connected_blocks],
+                          "delay_ps": round(delay_stats["net_delays"].get(n.name, 0.0), 2)} for n in self.plan.nets],
             }
             with open(path, "w") as f:
                 json.dump(data, f, indent=4)
@@ -628,13 +650,30 @@ class Visualizer:
         c.create_text(ox + W * z, oy + H * z + 6, anchor="ne", font=("Segoe UI", 9, "italic"), fill=DARK,
                       text=f"Die {W:g} \u00d7 {H:g} \u03bcm   |   utilization {util:.0f}%")
 
-        # nets
+        # nets & timing delay
+        delay_stats = calculate_delay_stats(floorplan)
+        critical_net_name = delay_stats.get("critical_net")
+        show_timing = self.show_delay.get()
+
         for net in floorplan.nets:
+            net_delay = delay_stats["net_delays"].get(net.name, 0.0)
+            is_critical = show_timing and (net.name == critical_net_name) and (len(delay_stats["net_delays"]) > 0)
+            wire_col = "#e74c3c" if is_critical else "#00897b"
+            wire_width = 3 if is_critical else 2
+            dash_pattern = (6, 2) if is_critical else (5, 3)
+
             for i in range(len(net.connected_blocks) - 1):
                 b1, b2 = net.connected_blocks[i], net.connected_blocks[i + 1]
-                c.create_line((b1.x + b1.width / 2) * z + ox, (b1.y + b1.height / 2) * z + oy,
-                              (b2.x + b2.width / 2) * z + ox, (b2.y + b2.height / 2) * z + oy,
-                              fill="#00897b", width=2, dash=(5, 3))
+                x1, y1 = (b1.x + b1.width / 2) * z + ox, (b1.y + b1.height / 2) * z + oy
+                x2, y2 = (b2.x + b2.width / 2) * z + ox, (b2.y + b2.height / 2) * z + oy
+                c.create_line(x1, y1, x2, y2, fill=wire_col, width=wire_width, dash=dash_pattern)
+
+                if show_timing and i == 0 and len(net.connected_blocks) >= 2:
+                    mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
+                    tag_text = f"{net_delay:.1f} ps (CRIT)" if is_critical else f"{net_delay:.1f} ps"
+                    tag_col = "#c0392b" if is_critical else "#004d40"
+                    tag_font = ("Segoe UI", 8, "bold") if is_critical else ("Segoe UI", 7)
+                    c.create_text(mid_x, mid_y - 8, text=tag_text, font=tag_font, fill=tag_col)
 
         # which blocks overlap?
         blocks = floorplan.blocks
@@ -671,15 +710,18 @@ class Visualizer:
             hx, hy = (b.x + b.width) * z + ox, (b.y + b.height) * z + oy
             c.create_rectangle(hx - HANDLE / 2, hy - HANDLE / 2, hx + HANDLE / 2, hy + HANDLE / 2, fill=ACCENT, outline="white", width=1)
 
+        crit_str = f"   Critical Delay: {delay_stats['max_delay']:.1f} ps" if delay_stats['max_delay'] > 0 else ""
         c.create_text(12, 12, anchor="nw", font=("Segoe UI", 11, "bold"), fill=DARK,
-                      text=f"Cost: {cost:,.1f}" + (f"   Temp: {temp:,.2f}   Iter: {iteration}" if iteration > 0 else ""))
+                      text=f"Cost: {cost:,.1f}" + crit_str + (f"   Temp: {temp:,.2f}   Iter: {iteration}" if iteration > 0 else ""))
 
         if iteration > 0:
             self.iterations_data.append(iteration); self.cost_data.append(cost); self.temp_data.append(temp)
-            self.ax_cost.clear(); self.ax_temp.clear()
+            self.delay_data.append(delay_stats["max_delay"])
+            self.ax_cost.clear(); self.ax_delay.clear(); self.ax_temp.clear()
             self._style_axes()
-            self.ax_cost.plot(self.iterations_data, self.cost_data, color="#1e90ff")
-            self.ax_temp.plot(self.iterations_data, self.temp_data, color="#ff4757")
+            self.ax_cost.plot(self.iterations_data, self.cost_data, color="#1e90ff", lw=1.2)
+            self.ax_delay.plot(self.iterations_data, self.delay_data, color="#e67e22", lw=1.2)
+            self.ax_temp.plot(self.iterations_data, self.temp_data, color="#ff4757", lw=1.2)
             self.plot_canvas.draw_idle()
             self.master.update()          # keeps the window responsive while the optimizer runs
         else:

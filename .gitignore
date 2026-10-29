@@ -22,6 +22,4 @@ htmlcov/
 # Build
 build/
 dist/
-*.egg-info/venv/
-__pycache__/
-*.pyc
+*.egg-info/
